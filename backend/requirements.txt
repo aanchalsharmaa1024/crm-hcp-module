@@ -8,3 +8,5 @@ langgraph==0.0.8
 langchain-core==0.2.1
 pydantic==2.7.1
 aiosqlite==0.20.0
+psycopg2-binary==2.9.9
+groq==0.33.0
