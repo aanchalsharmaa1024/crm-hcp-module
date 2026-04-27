@@ -1,9 +1,10 @@
 import React from 'react'
 import LogInteractionScreen from './components/LogInteractionScreen'
+import ToolsPanel from './components/ToolsPanel'
 
 function App() {
   return (
-    <div style={{ 
+    <div style={{
       fontFamily: "'Inter', sans-serif",
       background: '#f0f4f8',
       minHeight: '100vh',
@@ -14,6 +15,9 @@ function App() {
         rel="stylesheet"
       />
       <LogInteractionScreen />
+      <div style={{ marginTop: 16 }}>
+        <ToolsPanel />
+      </div>
     </div>
   )
 }

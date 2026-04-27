@@ -260,7 +260,7 @@ const s = {
   page: {
     fontFamily: "'Inter', sans-serif",
     background: '#f0f4f8',
-    minHeight: '100vh',
+    minHeight: '80vh',
     padding: '24px 16px',
   },
   screen: {
@@ -330,8 +330,8 @@ const s = {
     background: '#f0f7ff',
     borderLeft: '3px solid #1a56a0',
     borderRadius: '0 8px 8px 0',
-    padding: '10px 14px',
-    marginTop: 4,
+    padding: '6px 10px',
+    marginTop: 0,
   },
   aiSuggestTitle: {
     fontSize: 11, fontWeight: 500,
