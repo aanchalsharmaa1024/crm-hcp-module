@@ -10,7 +10,7 @@ import {
   resetForm,
 } from '../store/interactionSlice'
 
-const API = 'http://127.0.0.1:8000/api'
+const API = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api'
 
 export default function LogInteractionScreen() {
   const dispatch = useDispatch()
