@@ -4,10 +4,7 @@ from pydantic import BaseModel
 from app.database import get_db
 from app.models.interaction import Interaction
 from app.agent.prompts import EXTRACTION_PROMPT
-from app.agent.tools import (
-    search_hcp, edit_interaction,
-    schedule_followup, recommend_next_action
-)
+from app.agent.tools import search_hcp, edit_interaction, schedule_followup, recommend_next_action, log_interaction
 from datetime import date
 from dotenv import load_dotenv
 import json
@@ -15,11 +12,9 @@ import os
 from groq import Groq
 
 load_dotenv()
-
 router = APIRouter()
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-# ── Pydantic Models ──
 class ChatRequest(BaseModel):
     message: str
 
@@ -35,7 +30,6 @@ class InteractionCreate(BaseModel):
     outcomes: str
     follow_up_actions: str
 
-# ── Helper: clean LLM response ──
 def clean_json(raw: str) -> str:
     if "```" in raw:
         parts = raw.split("```")
@@ -44,7 +38,6 @@ def clean_json(raw: str) -> str:
             raw = raw[4:]
     return raw.strip()
 
-# ── POST /api/chat — Extract interaction data ──
 @router.post("/chat")
 async def chat_with_agent(req: ChatRequest):
     try:
@@ -66,25 +59,22 @@ async def chat_with_agent(req: ChatRequest):
         print(f"CHAT ERROR: {str(e)}")
         return {"status": "error", "message": str(e)}
 
-# ── POST /api/agent — Smart tool routing ──
 @router.post("/agent")
 async def agent_chat(req: AgentRequest):
     try:
-        # Step 1: LLM detects intent
         intent_prompt = f"""
-Analyze this message and return ONLY a JSON with these exact keys:
+Analyze this message and return ONLY JSON:
 {{
   "intent": "search_hcp" or "edit_interaction" or "schedule_followup" or "recommend" or "other",
   "hcp_name": "doctor name or null",
   "interaction_id": number or null,
-  "field": "field name to edit or null",
+  "field": "field name or null",
   "new_value": "new value or null",
   "date": "YYYY-MM-DD or null",
-  "notes": "extra notes or null"
+  "notes": "notes or null"
 }}
-
 Message: {req.message}
-Return ONLY JSON. No explanation.
+Return ONLY JSON.
 """
         r = groq_client.chat.completions.create(
             model="llama-3.3-70b-versatile",
@@ -96,40 +86,32 @@ Return ONLY JSON. No explanation.
         intent = intent_data.get("intent")
         hcp_name = intent_data.get("hcp_name") or ""
 
-        # Step 2: Call the right tool
         if intent == "search_hcp":
-            result = search_hcp.invoke({"hcp_name": hcp_name})
+            result = search_hcp(hcp_name)
             return {"status": "success", "intent": "search_hcp", "response": result}
-
         elif intent == "edit_interaction":
-            result = edit_interaction.invoke({
-                "interaction_id": intent_data.get("interaction_id") or 1,
-                "field": intent_data.get("field") or "",
-                "new_value": intent_data.get("new_value") or ""
-            })
+            result = edit_interaction(
+                intent_data.get("interaction_id") or 1,
+                intent_data.get("field") or "",
+                intent_data.get("new_value") or ""
+            )
             return {"status": "success", "intent": "edit_interaction", "response": result}
-
         elif intent == "schedule_followup":
-            result = schedule_followup.invoke({
-                "hcp_name": hcp_name,
-                "follow_up_date": intent_data.get("date") or "",
-                "notes": intent_data.get("notes") or ""
-            })
+            result = schedule_followup(
+                hcp_name,
+                intent_data.get("date") or "",
+                intent_data.get("notes") or ""
+            )
             return {"status": "success", "intent": "schedule_followup", "response": result}
-
         elif intent == "recommend":
-            result = recommend_next_action.invoke({"hcp_name": hcp_name})
+            result = recommend_next_action(hcp_name)
             return {"status": "success", "intent": "recommend", "response": result}
-
         else:
-            return {"status": "success", "intent": "other",
-                    "response": "Please use /api/chat for logging interactions."}
-
+            return {"status": "success", "intent": "other", "response": "Please use /api/chat for logging."}
     except Exception as e:
         print(f"AGENT ERROR: {str(e)}")
         return {"status": "error", "message": str(e)}
 
-# ── POST /api/interactions — Save form data ──
 @router.post("/interactions")
 def create_interaction(data: InteractionCreate, db: Session = Depends(get_db)):
     record = Interaction(
@@ -146,7 +128,6 @@ def create_interaction(data: InteractionCreate, db: Session = Depends(get_db)):
     db.refresh(record)
     return {"status": "success", "id": record.id}
 
-# ── GET /api/interactions — Fetch all interactions ──
 @router.get("/interactions")
 def get_interactions(db: Session = Depends(get_db)):
     records = db.query(Interaction).order_by(Interaction.id.desc()).limit(20).all()
